@@ -12,7 +12,6 @@ model User {
   id                 String       @id @default(uuid())
   name               String?
   email              String       @unique
-  password           String?
   location           String?
   phone              String?
   answers            UserAnswer[]
@@ -60,6 +59,7 @@ model Event {
 
   registrations EventRegistration[]
   invitations   Invitation[]
+  Review        Review[]
 
   @@index([name])
   @@index([price])
@@ -96,7 +96,7 @@ model Invitation {
   receiver   User   @relation("ReceivedInvitations", fields: [receiverId], references: [id])
   receiverId String
 
-  status    InviteStatus @default(SENT)
+  status    InviteStatus @default(DECLINED)
   createdAt DateTime     @default(now())
 
   @@unique([eventId, receiverId])
@@ -148,8 +148,11 @@ model UserAnswer {
 
 model Review {
   id      String  @id @default(uuid())
+  eventId String
+  event   Event   @relation(fields: [eventId], references: [id])
   rating  Int?    @default(0)
-  message String?
+  categoryId Int
+  comment String?
   userId  String
   user    User    @relation(fields: [userId], references: [id])
 }

@@ -1,6 +1,6 @@
 import express from "express"
 import { authorize } from "../../middlewares/authorize.middleware.js"
-import { sendInvitation, all, create, deleteEvent, filter, getById, register, search, update, rejectInvitation, acceptInvitation, checkRegisteredUser, cancelRegistration, submitReview } from "../../controllers/events/events.controller.js"
+import { sendInvitation, all, create, deleteEvent, filter, getById, register, search, update, rejectInvitation, acceptInvitation, checkRegisteredUser, cancelRegistration, submitReview, getReviews, invitedEvents, attendedEvents } from "../../controllers/events/events.controller.js"
 import { protect } from "../../middlewares/auth.middleware.js"
 
 const router = express.Router()
@@ -15,6 +15,7 @@ router.get("/authorized/filter", protect, authorize("ADMIN", "MARKETING"), filte
 router.get("/authorized/search", protect, authorize("ADMIN", "MARKETING"), search)
 router.post("/authorized/send", protect ,authorize("ADMIN", "MARKETING"), sendInvitation)
 router.post("/authorized/reject", protect ,authorize("ADMIN", "MARKETING"), rejectInvitation)
+router.get("/authorized/getReviews", protect, authorize("ADMIN", "MARKETING"), getReviews)
 
 // public routes
 router.get("/all", all)
@@ -26,5 +27,8 @@ router.delete("/cancelEvent/:id", protect, cancelRegistration)
 router.get("/checkRegisteredUser/:id", protect, checkRegisteredUser)
 router.post("/accept", protect, acceptInvitation)
 router.post("/submitReview", protect, submitReview)
+router.get("/invitedEvents", protect, invitedEvents)
+router.get("/attendedEvents", protect, attendedEvents)
+
 
 export default router

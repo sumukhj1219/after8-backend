@@ -90,10 +90,9 @@ export async function all(req: Request, res: Response, next: NextFunction) {
         name: true,
         scheduled: true,
         registrations: true,
-        price:true,
+        price: true,
         venue: true,
-        maxParticipants:true,
-        
+        maxSeats: true,
       }
     })
 
@@ -118,7 +117,8 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
         price: true,
         registrations: true,
         name: true,
-        scheduled: true
+        scheduled: true,
+        maxSeats: true,
       }
     })
 
@@ -258,9 +258,9 @@ export async function cancelRegistration(req: Request, res: Response, next: Next
     if (!eventId) throw new AppError("EventId not found", 404);
     if (!userId) throw new AppError("Unauthorized", 401);
 
-   await prisma.eventRegistration.delete({
+    await prisma.eventRegistration.delete({
       where: {
-        eventId_userId:{
+        eventId_userId: {
           eventId,
           userId
         }
@@ -439,30 +439,122 @@ export async function acceptInvitation(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function submitReview(req: Request, res: Response, next: NextFunction){
+export async function submitReview(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id ?? ""
-    const { rating,comment } = req.body;
+    const { eventId, reviews } = req.body;
 
-    if (!rating) {
-     throw new AppError("EventId and Rating is missing", 400)
+    if (!eventId || !Array.isArray(reviews) || reviews.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "eventId and reviews array are required",
+      });
     }
 
-    if (rating <= 0 || rating > 5) {
-      throw new AppError("Rating must be between 0 and 5")
-    }
-
-    const review = await prisma.review.create({
-      data: {
-        rating,
-        message:comment,
-        userId,
-      }
+    const existing = await prisma.review.findFirst({
+      where: { eventId, userId }
     });
 
-    return sendResponse(res, "Feedback submitted", 200, review)
+    if (existing) {
+      throw new AppError("You have already submitted the feedback", 400)
+    }
+
+    const reviewData = reviews.map((r) => ({
+      eventId,
+      userId,
+      categoryId: r.id,
+      rating: r.rating,
+      comment: r.message,
+    }));
+
+    await prisma.review.createMany({
+      data: reviewData,
+    });
+
+    return sendResponse(res, "Feedback submitted sucessfully", 200)
 
   } catch (error) {
-    next(error); 
+    next(error);
+  }
+}
+
+export async function getReviews(req: Request, res: Response, next: NextFunction) {
+  try {
+
+    const eventsFeedback = await prisma.event.findMany({
+      include:{
+        user:{
+          select:{
+            name:true
+          }
+        },
+        Review:true
+      }
+    })
+
+    return sendResponse(res, "Events feedback", 200, eventsFeedback)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export async function invitedEvents(req: Request, res: Response, next: NextFunction){
+  try {
+    const invitedEvents = await prisma.invitation.findMany({
+      where:{
+        receiverId:req.user?.id ?? "",
+        status:"SENT"
+      },
+      include:{
+        event:{
+          select:{
+            name:true,
+            scheduled:true,
+            maxSeats:true,
+            registrations:true,
+            venue:true
+          }
+        }
+      }
+    })
+
+    if(!invitedEvents){
+      throw new AppError("No invitations fo this user", 400)
+    }
+
+    return sendResponse(res, "Inviations", 200, invitedEvents)
+  } catch (error) {
+    next(error)
+  }
+}
+
+
+export async function attendedEvents(req: Request, res: Response, next: NextFunction){
+  try {
+    const invitedEvents = await prisma.invitation.findMany({
+      where:{
+        receiverId:req.user?.id ?? "",
+        status:"ACCEPTED"
+      },
+      include:{
+        event:{
+          select:{
+            name:true,
+            scheduled:true,
+            maxSeats:true,
+            registrations:true,
+            venue:true
+          }
+        }
+      }
+    })
+
+    if(!invitedEvents){
+      throw new AppError("No invitations fo this user", 400)
+    }
+
+    return sendResponse(res, "Inviations", 200, invitedEvents)
+  } catch (error) {
+    next(error)
   }
 }

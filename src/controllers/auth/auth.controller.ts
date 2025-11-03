@@ -20,15 +20,6 @@ export async function signup(req: Request, res: Response, next: NextFunction) {
         const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
         if (error) throw new AppError(error.message, 400);
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        await prisma.user.create({
-            data: {
-                id: data?.user?.id ?? undefined,
-                email,
-                password: hashedPassword,
-                name,
-            },
-        });
 
         return sendResponse(res, "User signed up successfully", 200, data)
     } catch (error) {
