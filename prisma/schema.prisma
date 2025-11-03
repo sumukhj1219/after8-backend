@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String       @id @default(uuid())
+  name               String?
+  email              String       @unique
+  password           String?
+  location           String?
+  phone              String?
+  answers            UserAnswer[]
+  events             Event[]      @relation("Admin")
+  marketing          Event[]      @relation("Marketing Manager")
+  participatingEvent Event[]      @relation("User")
+  role               ROLE         @default(USER)
+  createdAt          DateTime     @default(now())
+  reviews            Review[]
+
+  registrations   EventRegistration[]
+  sentInvites     Invitation[]        @relation("SentInvitations")
+  receivedInvites Invitation[]        @relation("ReceivedInvitations")
+
+  @@index([email])
+}
+
+model InvitedUser {
+  id     String @id @default(uuid())
+  userId String
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  name      String
+  keywords  String[]
+  maxSeats  Int
+  scheduled DateTime
+  price     Decimal  @default(0.0)
+  venue     String   @default("")
+
+  maxParticipants Int?
+
+  userId String?
+  user   User?   @relation("User", fields: [userId], references: [id])
+
+  adminId String
+  admin   User   @relation("Admin", fields: [adminId], references: [id])
+
+  marketingMgrId String?
+  marketingMgr   User?   @relation("Marketing Manager", fields: [marketingMgrId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  registrations EventRegistration[]
+  invitations   Invitation[]
+
+  @@index([name])
+  @@index([price])
+  @@index([venue])
+  @@index([scheduled])
+}
+
+model EventRegistration {
+  id        String             @id @default(uuid())
+  user      User               @relation(fields: [userId], references: [id])
+  userId    String
+  event     Event              @relation(fields: [eventId], references: [id])
+  eventId   String
+  status    RegistrationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+
+  @@unique([eventId, userId])
+}
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Invitation {
+  id      String @id @default(uuid())
+  event   Event  @relation(fields: [eventId], references: [id])
+  eventId String
+
+  sender   User   @relation("SentInvitations", fields: [senderId], references: [id])
+  senderId String
+
+  receiver   User   @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  receiverId String
+
+  status    InviteStatus @default(SENT)
+  createdAt DateTime     @default(now())
+
+  @@unique([eventId, receiverId])
+}
+
+enum InviteStatus {
+  SENT
+  ACCEPTED
+  DECLINED
+}
+
+enum ROLE {
+  USER
+  ADMIN
+  MARKETING
+}
+
+model Question {
+  id         String       @id @default(cuid())
+  // text       String?
+  options    Option[]
+  UserAnswer UserAnswer[]
+}
+
+model Option {
+  id          String       @id @default(cuid())
+  // text        String?
+  scaledValue Int?
+  question    Question?    @relation(fields: [questionId], references: [id])
+  questionId  String?
+  UserAnswer  UserAnswer[]
+}
+
+model UserAnswer {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  scaledValue Int?
+
+  question   Question @relation(fields: [questionId], references: [id])
+  questionId String
+
+  option   Option? @relation(fields: [optionId], references: [id])
+  optionId String?
+
+  @@unique([userId, questionId])
+}
+
+model Review {
+  id      String  @id @default(uuid())
+  rating  Int?    @default(0)
+  message String?
+  userId  String
+  user    User    @relation(fields: [userId], references: [id])
+}
