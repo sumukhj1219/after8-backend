@@ -1,7 +1,7 @@
 import express from "express"
 import { authorize } from "../../middlewares/authorize.middleware.js"
 import { protect } from "../../middlewares/auth.middleware.js"
-import { all, create, deleteUser, getUserById, me, updateProfile, updateUser } from "../../controllers/user/user.controller.js"
+import { all, create, deleteAccount, deleteUser, getUserById, me, updateProfile, updateUser } from "../../controllers/user/user.controller.js"
 
 const router = express.Router()
 
@@ -14,7 +14,8 @@ router.get("/authorized/get/:id", protect, authorize("ADMIN"), getUserById)
 
 // public routes
 router.get("/me/:id", protect, me)
-router.get("/updateProfile", protect, updateProfile)
+router.post("/updateProfile", protect, updateProfile)
+router.delete("/deleteAccount", protect, deleteAccount)
 
 
 export default router

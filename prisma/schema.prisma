@@ -46,13 +46,13 @@ model Event {
   maxParticipants Int?
 
   userId String?
-  user   User?   @relation("User", fields: [userId], references: [id])
+  user   User?   @relation("User", fields: [userId], references: [id], onDelete: Cascade)
 
   adminId String
-  admin   User   @relation("Admin", fields: [adminId], references: [id])
+  admin   User   @relation("Admin", fields: [adminId], references: [id], onDelete: Cascade)
 
   marketingMgrId String?
-  marketingMgr   User?   @relation("Marketing Manager", fields: [marketingMgrId], references: [id])
+  marketingMgr   User?   @relation("Marketing Manager", fields: [marketingMgrId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -69,7 +69,7 @@ model Event {
 
 model EventRegistration {
   id        String             @id @default(uuid())
-  user      User               @relation(fields: [userId], references: [id])
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   event     Event              @relation(fields: [eventId], references: [id])
   eventId   String
@@ -90,10 +90,10 @@ model Invitation {
   event   Event  @relation(fields: [eventId], references: [id])
   eventId String
 
-  sender   User   @relation("SentInvitations", fields: [senderId], references: [id])
+  sender   User   @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
   senderId String
 
-  receiver   User   @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  receiver   User   @relation("ReceivedInvitations", fields: [receiverId], references: [id], onDelete: Cascade)
   receiverId String
 
   status    InviteStatus @default(DECLINED)
@@ -132,7 +132,7 @@ model Option {
 
 model UserAnswer {
   id     String @id @default(cuid())
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   scaledValue Int?
@@ -154,5 +154,5 @@ model Review {
   categoryId Int
   comment String?
   userId  String
-  user    User    @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -128,7 +128,7 @@ export async function all(req: Request, res: Response, next: NextFunction) {
                 email: true,
                 phone: true,
                 role: true,
-                location:true
+                location: true
             }
         })
 
@@ -186,26 +186,45 @@ export async function me(req: Request, res: Response, next: NextFunction) {
     }
 }
 
-export async function updateProfile(req: Request, res: Response, next: NextFunction){
+export async function updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
         const userId = req.user?.id
-        if(!userId){
+        if (!userId) {
             throw new AppError("UserId not found", 404)
         }
-
         const parsed = updateUserProfileSchema.safeParse(req.body)
-        if(!parsed.success){
+
+        if (!parsed.success) {
             throw new AppError("Invalid inputs", 400)
         }
 
         await prisma.user.update({
-            where:{
+            where: {
                 id: userId
             },
-            data:{
+            data: {
                 name: parsed.data.name ?? "",
                 phone: parsed.data.phone ?? "",
                 location: parsed.data.location ?? ""
+            }
+        })
+
+        return sendResponse(res, "Updated sucessfully", 200)
+    } catch (error) {
+        next(error)
+    }
+}
+
+export async function deleteAccount(req: Request, res: Response, next: NextFunction) {
+    try {
+        const userId = req.user?.id
+        if (!userId) {
+            throw new AppError("UserId not found", 404)
+        }
+
+        await prisma.user.delete({
+            where:{
+                id:userId
             }
         })
     } catch (error) {
