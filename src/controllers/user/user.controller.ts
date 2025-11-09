@@ -227,6 +227,8 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
                 id:userId
             }
         })
+
+        return sendResponse(res, "Deleted Account", 200)
     } catch (error) {
         next(error)
     }
