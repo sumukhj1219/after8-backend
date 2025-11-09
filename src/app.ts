@@ -5,11 +5,12 @@ import authRouter from "./routers/auth/auth.router.js"
 import eventRouter from "./routers/events/events.routers.js"
 import userRouter from "./routers/user/user.routers.js"
 import matchRouter from "./routers/match-maker/match-maker.routers.js"
+import { ENV } from "./config/env.js"
 
 const app: Application = express()
 
 app.use(cors({
-  origin: 'http://after8.in',  
+  origin: ENV.FRONTEND_URL,  
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
