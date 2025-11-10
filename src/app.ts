@@ -9,8 +9,8 @@ import { ENV } from "./config/env.js"
 
 const app: Application = express()
 
-app.use(cors({
-  origin: [ENV.FRONTEND_URL, ENV.FRONTEND_LOCAL_URL],  
+app.options('*', cors({
+  origin: [ENV.FRONTEND_URL, ENV.FRONTEND_LOCAL_URL],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
