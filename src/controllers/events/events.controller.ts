@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AppError } from "../../middlewares/error.middleware.js";
-import { acceptInvitationSchema, createEventSchema, deleteEventSchema, filterEventSchema, rejectInvitationSchema, searchEventSchema, sendtInvitationSchema, updateEventSchema } from "../../validators/events.validators.js";
+import { createEventSchema, deleteEventSchema, filterEventSchema, searchEventSchema, updateEventSchema } from "../../validators/events.validators.js";
 import { prisma } from "../../config/db.js";
 import { sendResponse } from "../../utils/response.js";
 
@@ -21,7 +21,18 @@ export async function create(req: Request, res: Response, next: NextFunction) {
         price: eventData.price,
         venue: eventData.venue,
         adminId,
+        plan: eventData.plan
       },
+      select: {
+        id: true,
+        name: true,
+        maxSeats: true,
+        scheduled: true,
+        price: true,
+        venue: true,
+        adminId: true,
+        plan: true
+      }
     });
 
     return sendResponse(res, "Event created successfully", 201, createdEvent);
@@ -72,7 +83,17 @@ export async function update(req: Request, res: Response, next: NextFunction) {
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
       // @ts-ignore
-      data
+      data,
+      select: {
+        id: true,
+        name: true,
+        maxSeats: true,
+        scheduled: true,
+        price: true,
+        venue: true,
+        adminId: true,
+        plan: true
+      }
     });
 
     return sendResponse(res, "Event updated successfully", 200, updatedEvent);
@@ -93,6 +114,7 @@ export async function all(req: Request, res: Response, next: NextFunction) {
         price: true,
         venue: true,
         maxSeats: true,
+        plan: true
       }
     })
 
@@ -119,6 +141,7 @@ export async function getById(req: Request, res: Response, next: NextFunction) {
         name: true,
         scheduled: true,
         maxSeats: true,
+        plan: true
       }
     })
 
@@ -135,18 +158,30 @@ export async function filter(req: Request, res: Response, next: NextFunction) {
       throw new AppError(parsed.error.message, 400);
     }
 
-    const { name, city, price, keywords } = parsed.data;
+    const { name, venue, price, keywords } = parsed.data;
 
     const filter: any = {
       AND: [
         name ? { name: { contains: name, mode: "insensitive" } } : {},
-        city ? { location: { path: ["city"], equals: city } } : {},
+        venue ? { name: { contains: venue, mode: "insensitive" } } : {},
         price ? { price: { equals: price } } : {},
         keywords?.length ? { keywords: { hasSome: keywords } } : {},
       ],
     };
 
-    const events = await prisma.event.findMany({ where: filter });
+    const events = await prisma.event.findMany({
+      where: filter,
+      select: {
+        id: true,
+        name: true,
+        scheduled: true,
+        registrations: true,
+        price: true,
+        venue: true,
+        maxSeats: true,
+        plan: true
+      }
+    });
 
     res.status(200).json({
       message: "Filtered results retrieved successfully",
@@ -197,6 +232,13 @@ export async function register(req: Request, res: Response, next: NextFunction) 
       return res.json({ message: "Already registered", status: existing.status });
     }
 
+    const event = await prisma.event.findUnique({where:{id: eventId}, select:{plan:true}})
+    const user = await prisma.user.findUnique({where:{id: userId}, select:{plan:true}})
+
+    if(event?.plan !== user?.plan){
+      throw new AppError("User is not eligible for this event", 400)
+    }
+
     const registration = await prisma.eventRegistration.create({
       data: {
         eventId,
@@ -204,15 +246,6 @@ export async function register(req: Request, res: Response, next: NextFunction) 
         status: "PENDING"
       }
     });
-
-    await prisma.event.update({
-      where: {
-        id: eventId
-      },
-      data: {
-        userId: userId
-      }
-    })
 
     return res.json({
       message: "Registration successful",
@@ -275,169 +308,6 @@ export async function cancelRegistration(req: Request, res: Response, next: Next
   }
 }
 
-export async function sendInvitation(req: Request, res: Response, next: NextFunction) {
-  try {
-    const parsed = sendtInvitationSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError("EventId and ReceiverId required", 400);
-
-    const userId = req.user?.id;
-    if (!userId) throw new AppError("Unauthorized", 401);
-
-    const { eventId, recieverId } = parsed.data;
-
-    const registration = await prisma.eventRegistration.findFirst({
-      where: {
-        eventId: eventId,
-        userId: recieverId
-      }
-    });
-
-
-    if (!registration) throw new AppError("User not registered for event", 404);
-
-    const existingInvite = await prisma.invitation.findFirst({
-      where: { eventId, receiverId: recieverId }
-    });
-
-    if (existingInvite) throw new AppError("Invitation already sent", 400);
-
-    await prisma.invitation.upsert({
-      where: {
-        eventId_receiverId: {
-          eventId,
-          receiverId: recieverId
-        }
-      },
-      update: {
-        status: "SENT",
-        senderId: userId
-      },
-      create: {
-        status: "SENT",
-        senderId: userId,
-        receiverId: recieverId,
-        eventId
-      }
-    });
-
-
-    await prisma.eventRegistration.update({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: recieverId
-        }
-      },
-      data: { status: "PENDING" }
-    });
-
-    return sendResponse(res, "Invitation sent successfully", 200)
-
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function rejectInvitation(req: Request, res: Response, next: NextFunction) {
-  try {
-    const parsed = rejectInvitationSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError("EventId and ReceiverId required", 400);
-
-    const userId = req.user?.id;
-    if (!userId) throw new AppError("Unauthorized", 401);
-
-    const { eventId, recieverId } = parsed.data;
-
-    const registration = await prisma.eventRegistration.findFirst({
-      where: {
-        eventId: eventId,
-        userId: recieverId
-      }
-    });
-
-    if (!registration) throw new AppError("User not registered for event", 404);
-
-    await prisma.invitation.update({
-      where: {
-        eventId_receiverId: {
-          eventId,
-          receiverId: recieverId
-        }
-      },
-      data: {
-        status: "DECLINED"
-      }
-    });
-
-    await prisma.eventRegistration.update({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: recieverId
-        }
-      },
-      data: { status: "REJECTED" }
-    });
-
-
-    return sendResponse(res, "Invitation sent successfully", 200)
-
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function acceptInvitation(req: Request, res: Response, next: NextFunction) {
-  try {
-    const parsed = acceptInvitationSchema.safeParse(req.body);
-    if (!parsed.success) throw new AppError("EventId required", 400);
-
-    const userId = req.user?.id;
-    if (!userId) throw new AppError("Unauthorized", 401);
-
-    const { eventId } = parsed.data;
-
-    const invite = await prisma.invitation.findFirst({
-      where: {
-        eventId,
-        receiverId: userId,
-        status: "SENT"
-      }
-    });
-
-    if (!invite) throw new AppError("No pending invitation found", 404);
-
-    await prisma.invitation.update({
-      where: { id: invite.id },
-      data: { status: "ACCEPTED" }
-    });
-
-    const registration = await prisma.eventRegistration.findUnique({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: userId
-        }
-      }
-    });
-
-    if (!registration) throw new AppError("User not registered for event", 404);
-
-    await prisma.eventRegistration.update({
-      where: {
-        eventId_userId: {
-          eventId,
-          userId: userId
-        }
-      },
-      data: { status: "APPROVED" }
-    });
-
-    res.json({ message: "You're confirmed for the event 🎉" });
-  } catch (error) {
-    next(error);
-  }
-}
 
 export async function submitReview(req: Request, res: Response, next: NextFunction) {
   try {
@@ -482,13 +352,21 @@ export async function getReviews(req: Request, res: Response, next: NextFunction
   try {
 
     const eventsFeedback = await prisma.event.findMany({
-      include:{
-        user:{
-          select:{
-            name:true
+      select: {
+        user: {
+          select: {
+            name: true
           }
         },
-        Review:true
+        id:true,
+        name: true,
+        scheduled: true,
+        registrations: true,
+        price: true,
+        venue: true,
+        maxSeats: true,
+        plan: true,
+        Review: true
       }
     })
 
@@ -498,62 +376,32 @@ export async function getReviews(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function invitedEvents(req: Request, res: Response, next: NextFunction){
+
+export async function attendedEvents(req: Request, res: Response, next: NextFunction) {
   try {
-    const invitedEvents = await prisma.invitation.findMany({
-      where:{
-        receiverId:req.user?.id ?? "",
-        status:"SENT"
+    const attendedEvents = await prisma.eventRegistration.findMany({
+      where: {
+        userId: req.user?.id ?? "",
+        status: "APPROVED"
       },
-      include:{
-        event:{
-          select:{
-            name:true,
-            scheduled:true,
-            maxSeats:true,
-            registrations:true,
-            venue:true
+      include: {
+        event: {
+          select: {
+            name: true,
+            scheduled: true,
+            maxSeats: true,
+            registrations: true,
+            venue: true
           }
         }
       }
     })
 
-    if(!invitedEvents){
-      throw new AppError("No invitations fo this user", 400)
+    if (!attendedEvents) {
+      throw new AppError("User has not attended any events", 400)
     }
 
-    return sendResponse(res, "Inviations", 200, invitedEvents)
-  } catch (error) {
-    next(error)
-  }
-}
-
-
-export async function attendedEvents(req: Request, res: Response, next: NextFunction){
-  try {
-    const invitedEvents = await prisma.invitation.findMany({
-      where:{
-        receiverId:req.user?.id ?? "",
-        status:"ACCEPTED"
-      },
-      include:{
-        event:{
-          select:{
-            name:true,
-            scheduled:true,
-            maxSeats:true,
-            registrations:true,
-            venue:true
-          }
-        }
-      }
-    })
-
-    if(!invitedEvents){
-      throw new AppError("No invitations fo this user", 400)
-    }
-
-    return sendResponse(res, "Inviations", 200, invitedEvents)
+    return sendResponse(res, "Events", 200, attendedEvents)
   } catch (error) {
     next(error)
   }

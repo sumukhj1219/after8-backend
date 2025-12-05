@@ -1,9 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
-import { createUserSchema, updateUserProfileSchema, updateUserSchema } from "../../validators/users.validators.js";
+import { createUserSchema,  updateUserProfileSchema, updateUserSchema } from "../../validators/users.validators.js";
 import { AppError } from "../../middlewares/error.middleware.js";
 import { prisma } from "../../config/db.js";
 import { sendResponse } from "../../utils/response.js";
 import { supabase } from "../../config/supabase.js";
+import { BADGES } from "@prisma/client";
 
 
 export async function create(req: Request, res: Response, next: NextFunction) {
@@ -128,7 +129,8 @@ export async function all(req: Request, res: Response, next: NextFunction) {
                 email: true,
                 phone: true,
                 role: true,
-                location: true
+                location: true,
+                badges: true
             }
         })
 
@@ -165,7 +167,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 
 export async function me(req: Request, res: Response, next: NextFunction) {
     try {
-        const userId = req.params.id
+        const userId = req.user?.id
         if (!userId) {
             throw new AppError("Unable to find userId", 404)
         }
@@ -176,7 +178,15 @@ export async function me(req: Request, res: Response, next: NextFunction) {
             },
             select: {
                 email: true,
-                name: true
+                name: true,
+                badges: true,
+                registrations: true,
+                score:true,
+                level:{
+                    select:{
+                        name:true,
+                    }
+                }
             }
         })
 
@@ -223,8 +233,8 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
         }
 
         await prisma.user.delete({
-            where:{
-                id:userId
+            where: {
+                id: userId
             }
         })
 
@@ -233,3 +243,109 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
         next(error)
     }
 }
+
+export async function assignBadges(req: Request, res: Response, next: NextFunction) {
+    try {
+        const userId = req.user?.id
+        if (!userId) {
+            throw new AppError("UserId not found", 404)
+        }
+
+        const user = await prisma.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { reviews: true, events: true, registrations: { where: { status: "APPROVED" } }, badges: true }
+        });
+
+        const rules = await prisma.badgeRules.findMany()
+
+        const userStats = {
+            dinnersAttended: user.registrations.length,
+            dinnersHosted: user.events.length,
+            fiveStarReviews: user.reviews.filter(r => r.rating === 5).length,
+            avgRating: user.reviews.reduce((a, b) => a + (b.rating as number), 0) / user.reviews.length,
+            // TODO: referals:
+            maxCommentLength: user.reviews.reduce((a, b) => Math.max(a, b.comment?.length as number), 0)
+        };
+
+        const newBadges: BADGES[] = []
+
+        for (const rule of rules) {
+            switch (rule.badge) {
+                case BADGES.SPARK_MEMBER:
+                    if (rule.dinners && userStats.dinnersAttended >= rule.dinners) {
+                        newBadges.push(BADGES.SPARK_MEMBER);
+                    }
+                    break;
+
+                case BADGES.AFTER8_INSIDER:
+                    if (rule.dinners && userStats.dinnersAttended >= rule.dinners) {
+                        newBadges.push(BADGES.AFTER8_INSIDER);
+                    }
+                    break;
+
+                case BADGES.LEGACY_MEMBER:
+                    if (rule.dinners && userStats.dinnersAttended >= rule.dinners) {
+                        newBadges.push(BADGES.LEGACY_MEMBER);
+                    }
+                    break;
+
+                case BADGES.TABLE_FAVOURITE:
+                    if (rule.reviews && userStats.fiveStarReviews >= rule.reviews) {
+                        newBadges.push(BADGES.TABLE_FAVOURITE);
+                    }
+                    break;
+
+                case BADGES.LEGENDARY_PRESENCE:
+                    if (rule.reviews && userStats.fiveStarReviews >= rule.reviews) {
+                        newBadges.push(BADGES.LEGENDARY_PRESENCE);
+                    }
+                    break;
+
+                case BADGES.GOLDEN_SPOON:
+                    if (rule.avgRating && userStats.avgRating >= rule.avgRating) {
+                        newBadges.push(BADGES.GOLDEN_SPOON);
+                    }
+                    break;
+
+                case BADGES.THE_FOOD_ORACLE:
+                    if (rule.commentFeedLength && userStats.maxCommentLength >= rule.commentFeedLength) {
+                        newBadges.push(BADGES.THE_FOOD_ORACLE);
+                    }
+                    break;
+
+                // case BADGES.THE_PLUS_ONE_MAGNET:
+                //     if (rule.minReferrals && userStats.referrals >= rule.minReferrals) {
+                //         newBadges.push(BADGES.THE_PLUS_ONE_MAGNET);
+                //     }
+                //     break;
+
+                case BADGES.HOST_TITLE:
+                    if (rule.hosted && rule.reviews && userStats.dinnersHosted >= rule.hosted && userStats.fiveStarReviews >= rule.reviews) {
+                        newBadges.push(BADGES.HOST_TITLE);
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        const userBadges = await prisma.user.update({
+            where: {
+                id: userId
+            },
+            data: {
+                badges: Array.from(new Set([...user.badges, ...newBadges]))
+            },
+            select: {
+                badges: true
+            }
+        })
+
+        return sendResponse(res, "Badges Assigned", 200, userBadges)
+
+    } catch (error) {
+        next(error)
+    }
+}
+

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const plans = z.enum(["BASIC", "GOLD", "PLATINUM"]).default("BASIC")
+
 export const createEventSchema = z.object({
     name: z.string().nonempty("Event name is required and cannot be empty"),
     maxSeats: z.number()
@@ -9,7 +11,8 @@ export const createEventSchema = z.object({
         .refine((val) => !isNaN(Date.parse(val)), "Scheduled date must be a valid date"),
     price: z.number()
         .positive("Price must be a positive number"),
-    venue: z.string().nonempty("Event venue is required.")
+    venue: z.string().nonempty("Event venue is required."),
+    plan: plans
 });
 
 
@@ -20,8 +23,6 @@ export const deleteEventSchema = z.object({
 
 export const updateEventSchema = z.object({
     name: z.string().nonempty("Event name is required and cannot be empty"),
-    title: z.string().min(5, "Event title must be at least 5 characters long"),
-    description: z.string().min(10, "Event description must be at least 10 characters long"),
     maxSeats: z.number()
         .int("Total seats must be an integer")
         .positive("Total seats must be a positive number"),
@@ -31,17 +32,9 @@ export const updateEventSchema = z.object({
     ),
     price: z.number()
         .positive("Price must be a positive number"),
-    location: z.object({
-        city: z.string().min(1, "City is required"),
-        state: z.string().min(1, "State is required"),
-        pincode: z.string().regex(/^\d{5,6}$/, "Pincode must be 5 or 6 digits"),
-    }).optional().or(z.literal(undefined)),
-
-    maxParticipants: z.number()
-        .int("Max participants must be an integer")
-        .positive("Max participants must be a positive number")
-        .optional().or(z.literal(undefined)),
+    venue: z.string().nonempty("Event venue is required."),
     keywords: z.array(z.string()).optional().or(z.literal(undefined)),
+    plan: plans
 });
 
 
@@ -51,9 +44,9 @@ export const filterEventSchema = z.object({
         .min(1, "Name cannot be empty")
         .optional()
         .or(z.literal(undefined)),
-    city: z
+    venue: z
         .string()
-        .min(1, "City name must be at least 1 character long")
+        .min(1, "Venue name must be at least 1 character long")
         .optional()
         .or(z.literal(undefined)),
     price: z
@@ -78,16 +71,4 @@ export const searchEventSchema = z.object({
         .or(z.literal(undefined)),
 })
 
-export const sendtInvitationSchema = z.object({
-    recieverId: z.string(),
-    eventId: z.string()
-})
 
-export const rejectInvitationSchema = z.object({
-    recieverId: z.string(),
-    eventId: z.string()
-})
-
-export const acceptInvitationSchema = z.object({
-    eventId: z.string()
-})

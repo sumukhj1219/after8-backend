@@ -5,14 +5,15 @@ import authRouter from "./routers/auth/auth.router.js"
 import eventRouter from "./routers/events/events.routers.js"
 import userRouter from "./routers/user/user.routers.js"
 import matchRouter from "./routers/match-maker/match-maker.routers.js"
+import gameRouter from "./routers/game/game.routers.js"
 import { ENV } from "./config/env.js"
 
 const app: Application = express()
 
-app.options('*', cors({
+app.use(cors({
   origin: [ENV.FRONTEND_URL, ENV.FRONTEND_LOCAL_URL],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
 }));
 
 app.use(express.json())
@@ -25,8 +26,9 @@ app.get("/",(_,res)=>{
 
 app.use("/api/auth", authRouter)
 app.use("/api/events", eventRouter)
-app.use("/api/users/", userRouter)
+app.use("/api/users", userRouter)
 app.use("/api/matches", matchRouter)
+app.use("/api/game", gameRouter)
 
 
 app.use(errorHandler)

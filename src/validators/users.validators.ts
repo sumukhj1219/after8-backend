@@ -1,3 +1,4 @@
+import { PLANS } from "@prisma/client";
 import { z } from "zod";
 
 export const createUserSchema = z.object({
@@ -26,3 +27,6 @@ export const updateUserProfileSchema = z.object({
     location: z.string().optional(),
     phone: z.string().optional(),
 })
+
+
+

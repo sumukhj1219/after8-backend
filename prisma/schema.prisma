@@ -9,39 +9,91 @@ datasource db {
 }
 
 model User {
-  id                 String       @id @default(uuid())
-  name               String?
-  email              String       @unique
-  location           String?
-  phone              String?
-  answers            UserAnswer[]
-  events             Event[]      @relation("Admin")
-  marketing          Event[]      @relation("Marketing Manager")
-  participatingEvent Event[]      @relation("User")
-  role               ROLE         @default(USER)
-  createdAt          DateTime     @default(now())
-  reviews            Review[]
+  id       String       @id @default(uuid())
+  name     String?
+  email    String       @unique
+  location String?
+  phone    String?
+  answers  UserAnswer[]
+  badges   BADGES[]     @default([])
+  score    Int          @default(0)
 
-  registrations   EventRegistration[]
-  sentInvites     Invitation[]        @relation("SentInvitations")
-  receivedInvites Invitation[]        @relation("ReceivedInvitations")
+  level   Level?  @relation(fields: [levelId], references: [id])
+  levelId String?
+
+  events             Event[] @relation("Admin")
+  marketing          Event[] @relation("Marketing Manager")
+  participatingEvent Event[] @relation("User")
+
+  role      ROLE     @default(USER)
+  createdAt DateTime @default(now())
+  reviews   Review[]
+  plan      PLANS    @default(BASIC)
+
+  registrations EventRegistration[]
 
   @@index([email])
 }
 
-model InvitedUser {
-  id     String @id @default(uuid())
-  userId String
+enum PLANS {
+  BASIC
+  GOLD
+  PLATINUM
+}
+
+enum BADGES {
+  SPARK_MEMBER
+  AFTER8_INSIDER
+  LEGACY_MEMBER
+  TABLE_FAVOURITE
+  LEGENDARY_PRESENCE
+  HOST_TITLE
+  GOLDEN_SPOON
+  THE_ICEBREAKER
+  THE_FOOD_ORACLE
+  THE_PLUS_ONE_MAGNET
+}
+
+model BadgeRules {
+  id                String @id @default(uuid())
+  badge             BADGES @unique
+  dinners           Int?
+  hosted            Int?
+  reviews           Int?
+  avgRating         Float?
+  minReferals       Int?
+  minTagCount       Int?
+  commentFeedLength Int?
+}
+
+model Level {
+  id                String @id @default(uuid())
+  name              String  @unique
+  minScore          Int 
+  maxScore          Int? 
+  dinners           Int?
+  hosted            Int?
+  reviews           Int?
+  avgRating         Float?
+  minReferals       Int?
+  minTagCount       Int?
+  commentFeedLength Int?
+  totalBadges       Int?
+  plan              PLANS
+  users             User[]
+
+  @@unique([minScore, maxScore])
 }
 
 model Event {
   id        String   @id @default(uuid())
-  name      String
+  name      String   
   keywords  String[]
   maxSeats  Int
   scheduled DateTime
   price     Decimal  @default(0.0)
   venue     String   @default("")
+  plan      PLANS    @default(BASIC)
 
   maxParticipants Int?
 
@@ -58,8 +110,8 @@ model Event {
   updatedAt DateTime @updatedAt
 
   registrations EventRegistration[]
-  invitations   Invitation[]
-  Review        Review[]
+
+  Review Review[]
 
   @@index([name])
   @@index([price])
@@ -85,29 +137,6 @@ enum RegistrationStatus {
   REJECTED
 }
 
-model Invitation {
-  id      String @id @default(uuid())
-  event   Event  @relation(fields: [eventId], references: [id])
-  eventId String
-
-  sender   User   @relation("SentInvitations", fields: [senderId], references: [id], onDelete: Cascade)
-  senderId String
-
-  receiver   User   @relation("ReceivedInvitations", fields: [receiverId], references: [id], onDelete: Cascade)
-  receiverId String
-
-  status    InviteStatus @default(DECLINED)
-  createdAt DateTime     @default(now())
-
-  @@unique([eventId, receiverId])
-}
-
-enum InviteStatus {
-  SENT
-  ACCEPTED
-  DECLINED
-}
-
 enum ROLE {
   USER
   ADMIN
@@ -116,14 +145,12 @@ enum ROLE {
 
 model Question {
   id         String       @id @default(cuid())
-  // text       String?
   options    Option[]
   UserAnswer UserAnswer[]
 }
 
 model Option {
   id          String       @id @default(cuid())
-  // text        String?
   scaledValue Int?
   question    Question?    @relation(fields: [questionId], references: [id])
   questionId  String?
@@ -147,12 +174,12 @@ model UserAnswer {
 }
 
 model Review {
-  id      String  @id @default(uuid())
-  eventId String
-  event   Event   @relation(fields: [eventId], references: [id])
-  rating  Int?    @default(0)
+  id         String  @id @default(uuid())
+  eventId    String
+  event      Event   @relation(fields: [eventId], references: [id])
+  rating     Int?    @default(0)
   categoryId Int
-  comment String?
-  userId  String
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment    String?
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
